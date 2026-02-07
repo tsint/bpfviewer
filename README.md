@@ -130,8 +130,8 @@ Licensed under the Apache License, Version 2.0 or the Mulan Permissive
 Software License, Version 2 (Mulan PSL v2). You may choose either license 
 to govern your use of this software.
 
-Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
-Mulan PSL v2: https://license.coscl.org.cn/MulanPSL2
+1. Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0 
+2. Mulan PSL v2: https://license.coscl.org.cn/MulanPSL2
 
 Unless required by applicable law or agreed to in writing, software 
 distributed under either license is distributed on an "AS IS" BASIS, 
