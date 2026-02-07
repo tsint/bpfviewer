@@ -1,0 +1,1593 @@
+<!--
+  Copyright (c) 2026 tsint
+  SPDX-License-Identifier: Apache-2.0 OR MulanPSL-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPF Viewer</title>
+    <!-- 电路板图标 -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230969da'/><g fill='white' stroke='white' stroke-width='2'><rect x='20' y='20' width='15' height='15' rx='3'/><rect x='65' y='20' width='15' height='15' rx='3'/><rect x='20' y='65' width='15' height='15' rx='3'/><rect x='65' y='65' width='15' height='15' rx='3'/><path d='M35,35 L65,35 M35,65 L65,65 M50,20 L50,35 M50,65 L50,80'/></g></svg>">
+
+    <style>
+        :root {
+            --color-bg: #f6f8fa;
+            --color-fg: #24292f;
+            --color-primary: #0969da;
+            --color-primary-light: #218bff;
+            --color-muted: #57606a;
+            --color-border: #d0d7de;
+            --color-white: #fff;
+            --color-success: #1f883d;
+            --color-success-hover: #1a7f37;
+            --radius-md: 12px;
+            --radius-sm: 6px;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, .12), 0 4px 12px rgba(0, 0, 0, .08);
+            --shadow-md: 0 4px 20px rgba(9, 105, 218, .2);
+            --transition: all .2s ease;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--color-bg);
+            color: var(--color-fg);
+            min-height: 100vh
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+            padding: 30px 40px;
+            margin-bottom: 20px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md)
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: var(--color-white);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 15px
+        }
+
+        .header p {
+            margin: 8px 0 0 0;
+            color: hsla(0, 0%, 100%, .9);
+            font-size: .95rem
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .home-btn {
+            background: rgba(255, 255, 255, .2);
+            color: var(--color-white);
+            border: 1px solid rgba(255, 255, 255, .3);
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-size: .9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none
+        }
+
+        .home-btn:hover {
+            background: rgba(255, 255, 255, .3);
+            transform: translateX(-3px)
+        }
+
+        .icon {
+            width: 1.2em;
+            height: 1.2em;
+            fill: currentColor;
+            vertical-align: middle
+        }
+
+        #tabs {
+            background: var(--color-white);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-border);
+            margin-top: 20px;
+        }
+
+        .ui-tabs-nav {
+            display: flex;
+            background: var(--color-bg);
+            border: none;
+            border-bottom: 1px solid var(--color-border);
+            margin: 0;
+            padding: 0;
+            list-style: none
+        }
+
+        .ui-tabs-nav li {
+            margin: 0;
+            padding: 0
+        }
+
+        .ui-tabs-nav li a {
+            display: block;
+            background: transparent;
+            border: none;
+            color: var(--color-muted);
+            padding: 16px 24px;
+            font-size: .95rem;
+            font-weight: 500;
+            transition: var(--transition);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px
+        }
+
+        .ui-tabs-nav li.ui-tabs-active {
+            background: var(--color-white);
+        }
+
+        .ui-tabs-nav li.ui-tabs-active a {
+            color: var(--color-primary);
+            border-bottom: 2px solid var(--color-primary);
+        }
+
+        .ui-tabs-nav li a:hover {
+            color: var(--color-fg);
+            background: rgba(9, 105, 218, .08)
+        }
+
+        .ui-tabs-nav li.ui-tabs-active a:hover {
+            background: transparent
+        }
+
+        .ui-tabs-panel {
+            padding: 0;
+            background: var(--color-white);
+            display: none;
+        }
+
+        .ui-tabs-panel.active {
+            display: block;
+        }
+
+        .code-container {
+            position: relative;
+            background: var(--color-white);
+            margin: 0
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--color-bg);
+            border-bottom: 1px solid var(--color-border);
+            gap: 12px;
+            flex-wrap: wrap
+        }
+
+        .code-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: .9rem;
+            color: var(--color-muted)
+        }
+
+        .code-title .icon {
+            color: var(--color-primary)
+        }
+
+        .code-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center
+        }
+
+        .search-box input {
+            padding: 8px 12px 8px 34px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: .85rem;
+            width: 200px;
+            background: var(--color-white);
+            color: var(--color-fg);
+            transition: width .2s ease
+        }
+
+        .search-box input:focus {
+            outline: 0;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, .1);
+            width: 280px
+        }
+
+        .search-box .icon {
+            position: absolute;
+            left: 12px;
+            color: var(--color-muted);
+            width: .8rem;
+            height: .8rem;
+            pointer-events: none
+        }
+
+        .search-count {
+            font-size: .8rem;
+            color: var(--color-muted);
+            background: var(--color-bg);
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border)
+        }
+
+        .nav-btn {
+            background: var(--color-bg);
+            color: var(--color-fg);
+            border: 1px solid var(--color-border);
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            font-size: .8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 4px
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: #f3f4f6;
+            border-color: #8b949e
+        }
+
+        .nav-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed
+        }
+
+        .copy-btn {
+            background: var(--color-success);
+            color: var(--color-white);
+            border: 0;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: .85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition)
+        }
+
+        .copy-btn:hover,
+        .copy-btn.copied {
+            background: var(--color-success-hover)
+        }
+
+        pre {
+            margin: 0;
+            padding: 20px 0;
+            background: var(--color-white);
+            overflow-x: auto;
+            overflow-y: hidden
+        }
+
+        .code-wrapper {
+            position: relative
+        }
+
+        .code-content {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            font-size: .9rem;
+            line-height: 1.2;
+            padding: 0 20px;
+            display: block;
+            white-space: pre;
+            color: var(--color-fg)
+        }
+
+        .bpf-line {
+            display: block;
+            padding: 0;
+            margin: 0
+        }
+
+        .bpf-line.comment {
+            margin: 4px 0 1px
+        }
+
+        .bpf-line.label {
+            margin: 6px 0 2px
+        }
+
+        .bpf-line.highlight {
+            background: #fff8c5;
+            border-radius: 3px
+        }
+
+        .jump-link {
+            color: var(--color-primary);
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 3px;
+            padding: 1px 4px;
+            transition: background .2s ease
+        }
+
+        .jump-link:hover {
+            background: rgba(9, 105, 218, .1);
+            text-decoration: underline
+        }
+
+        .jump-target {
+            background: #dbedff;
+            border-radius: 3px
+        }
+
+        .bpf-line-number {
+            color: var(--color-primary);
+            font-weight: 600;
+            margin-right: 8px;
+            user-select: none
+        }
+
+        .bpf-opcode,
+        .bpf-keyword,
+        .c-keyword {
+            color: #cf222e;
+            font-weight: 600
+        }
+
+        .bpf-class,
+        .bpf-type,
+        .c-type {
+            color: #953800
+        }
+
+        .bpf-register,
+        .bpf-number,
+        .c-number,
+        .c-sec {
+            color: #0550ae
+        }
+
+        .bpf-string {
+            color: #0a3069
+        }
+
+        .bpf-comment,
+        .c-comment {
+            color: #6e7781;
+            font-style: italic
+        }
+
+        .bpf-label {
+            color: #8250df;
+            font-weight: 600
+        }
+
+        .bpf-macro,
+        .c-macro {
+            color: #116329
+        }
+
+        .mermaid-wrapper {
+            position: relative;
+            width: 100%;
+            min-height: 500px;
+            height: calc(100vh - 250px);
+            overflow: hidden;
+            background: var(--color-white)
+        }
+
+        .mermaid-toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            display: flex;
+            gap: 5px;
+            background: var(--color-white);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .1)
+        }
+
+        .mermaid-toolbar button {
+            background: var(--color-bg);
+            color: var(--color-fg);
+            border: 1px solid var(--color-border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: .8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 4px
+        }
+
+        .mermaid-toolbar button:hover {
+            background: #e5e7ea;
+            border-color: #8b949e
+        }
+
+        .mermaid-viewport {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            cursor: grab
+        }
+
+        .mermaid-viewport:active {
+            cursor: grabbing
+        }
+
+        .mermaid-content {
+            transform-origin: 0 0;
+            transition: transform .2s ease;
+            min-width: 100%;
+            min-height: 100%;
+            padding: 20px
+        }
+
+        /* Mermaid highlighting */
+        .mermaid-content g.selected,
+        .mermaid-content g.selected>*,
+        .mermaid-content g.related,
+        .mermaid-content g.related>*,
+        .mermaid-content g.selected text,
+        .mermaid-content g.related text,
+        .mermaid-content g.selected span,
+        .mermaid-content g.related span {
+            opacity: 1 !important
+        }
+
+        .mermaid-content g.selected {
+            filter: drop-shadow(0 0 8px rgba(9, 105, 218, .5))
+        }
+
+        .mermaid-content g.dimmed {
+            opacity: 1
+        }
+
+        .mermaid-content g.dimmed>rect,
+        .mermaid-content g.dimmed>circle,
+        .mermaid-content g.dimmed>polygon,
+        .mermaid-content g.dimmed>.cluster rect,
+        .mermaid-content g.dimmed>.cluster circle,
+        .mermaid-content g.dimmed>.cluster polygon {
+            opacity: .2
+        }
+
+        .mermaid-content path.dimmed,
+        .mermaid-content g.dimmed>path,
+        .mermaid-content g.edgeLabel.dimmed,
+        .mermaid-content g.edgeLabel.dimmed>*,
+        .mermaid-content g.dimmed .edgeLabel,
+        .mermaid-content g.dimmed .edgeLabel>* {
+            opacity: .1 !important
+        }
+
+        .mermaid-content path.related,
+        .mermaid-content g.related>path,
+        .mermaid-content g.edgeLabel.related,
+        .mermaid-content g.edgeLabel.related>*,
+        .mermaid-content g.related .edgeLabel,
+        .mermaid-content g.related .edgeLabel>* {
+            opacity: 1 !important
+        }
+
+        .mermaid {
+            text-align: center
+        }
+
+        @media (max-width:768px) {
+            .container {
+                padding: 10px
+            }
+
+            .header {
+                padding: 20px;
+                border-radius: 8px
+            }
+
+            .header h1 {
+                font-size: 1.5rem
+            }
+
+            .code-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch
+            }
+
+            .search-box input,
+            .search-box input:focus {
+                width: 100%
+            }
+
+            .code-actions {
+                flex-wrap: wrap
+            }
+
+            .code-content {
+                font-size: .8rem;
+                padding: 0 15px
+            }
+
+            .mermaid-wrapper {
+                height: calc(100vh - 200px);
+                /* 移动端调整高度 */
+                min-height: 400px;
+            }
+
+            .back-to-top {
+                bottom: 20px;
+                right: 20px;
+                width: 45px;
+                height: 45px;
+            }
+
+            .back-to-top:hover {
+                width: 120px;
+            }
+        }
+
+        /* 添加icon加载动画 */
+        .icon-loading {
+            animation: spin 1.5s linear infinite;
+        }
+
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(9, 105, 218, 0.3);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(9, 105, 218, 0.4);
+            width: 140px;
+        }
+
+        .back-to-top i {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .back-to-top .text {
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 2px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .back-to-top:hover i {
+            transform: scale(1.1);
+        }
+
+        .back-to-top:hover .text {
+            opacity: 1;
+            transform: translateY(0);
+            display: block;
+        }
+
+        /* 添加返回顶部动画效果 */
+        @keyframes bounce {
+
+            0%,
+            20%,
+            60%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-10px);
+            }
+
+            80% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .back-to-top:active {
+            animation: bounce 0.6s ease;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 使用Tabler Icons CDN - 轻量、美观、加载快 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.35.0/tabler-icons.min.css"
+        integrity="" crossorigin="anonymous">
+
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <div>
+                    <h1><i class="ti ti-cpu icon-loading"></i> BPF Viewer</h1>
+                    <p>A web-based tool for visualizing and analyzing BPF bytecode disassembly</p>
+                    <p style="margin-top: 12px;">
+                        <a href="https://github.com/tsint/bpfviewer" target="_blank" style="color: hsla(0, 0%, 100%, .9); text-decoration: none;">
+                            <i class="ti ti-brand-github" style="vertical-align: middle;"></i> https://github.com/tsint/bpfviewer
+                        </a>
+                    </p>
+                </div>
+                {{if .HomeURL}}
+                <a href="{{.HomeURL}}" class="home-btn">
+                    <i class="ti ti-home"></i> Home
+                </a>
+                {{end}}
+            </div>
+        </div>
+
+        <div id="tabs">
+            <ul class="ui-tabs-nav">
+                <li><a href="#tab-1"><i class="ti ti-file-code"></i> {{.CodeTitle}}</a></li>
+                <li><a href="#tab-2"><i class="ti ti-chart-dots"></i> {{.GraphTitle}}</a></li>
+            </ul>
+            <div id="tab-1" class="ui-tabs-panel active">
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="code-title"><i class="ti ti-code"></i> Source </span>
+                        <div class="code-actions">
+                            <div class="search-box">
+                                <i class="ti ti-search icon"></i>
+                                <input type="text" id="search-input" placeholder="Search code...">
+                            </div>
+                            <span class="search-count" id="search-count" style="display: none;">0/0</span>
+                            <button class="nav-btn" id="prev-match" title="Previous match" disabled>
+                                <i class="ti ti-chevron-up"></i>
+                            </button>
+                            <button class="nav-btn" id="next-match" title="Next match" disabled>
+                                <i class="ti ti-chevron-up" style="transform:rotate(180deg)"></i>
+                            </button>
+                            <button class="copy-btn" id="copy-btn">
+                                <i class="ti ti-copy"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                    <pre><div class="code-wrapper"><code class="code-content" id="code-content">{{.CodeContent}}</code></div></pre>
+                </div>
+            </div>
+            <div id="tab-2" class="ui-tabs-panel">
+                <div class="mermaid-wrapper">
+                    <div class="mermaid-toolbar">
+                        <button id="zoom-in-btn" title="Zoom In">
+                            <i class="ti ti-zoom-in"></i>
+                        </button>
+                        <button id="zoom-out-btn" title="Zoom Out">
+                            <i class="ti ti-zoom-out"></i>
+                        </button>
+                        <button id="reset-zoom-btn" title="Reset Zoom">
+                            <i class="ti ti-zoom-reset"></i>
+                        </button>
+                    </div>
+                    <div class="mermaid-viewport" id="mermaid-viewport">
+                        <div class="mermaid-content" id="mermaid-content">
+                            <div class="mermaid" id="mermaid-diagram">
+                                {{.GraphContent}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 回到顶部按钮 -->
+    <div class="back-to-top" id="backToTop">
+        <i class="ti ti-arrow-up"></i>
+        <span class="text">Back To Top</span>
+    </div>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.5/dist/mermaid.esm.min.mjs';
+
+        // 初始化mermaid但不立即运行
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            flowchart: { useMaxWidth: true, htmlLabels: true }
+        });
+
+        // 暴露mermaid给全局，以便在Tab切换时使用
+        window.mermaidInstance = mermaid;
+    </script>
+
+    <script>
+        'use strict';
+
+        // ========== Mermaid Graph Module ==========
+        const MermaidGraph = (() => {
+            let scale = 1;
+            let selectedNode = null;
+            let graphData = { nodes: [], edges: [] };
+            let allNodes = [];
+            let allEdges = [];
+
+            let mermaidGraphText = '';
+            // 标记是否已渲染
+            let isRendered = false;
+
+            // Cached regex patterns
+            const NODE_REGEX = /^([\w.]+)\[(?:(?:"(.+?)")|(?:\((.+?)\)))?\]/;
+            const EDGE_REGEX = /^([\w.]+)\s+\-\-.+?\-\->\s+([\w.]+)/;
+            const MAP_NODES = "{{.GraphMapNodes}}".split(',');
+
+            const isMapNode = id => MAP_NODES.some(name => id.includes(name));
+
+            const parseGraph = text => {
+                const nodes = [], edges = [];
+                for (const line of text.split('\n')) {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed.startsWith('flowchart') || trimmed.startsWith('graph')) continue;
+
+                    const decoded = trimmed.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+                    const nodeMatch = decoded.match(NODE_REGEX);
+                    if (nodeMatch) nodes.push({ id: nodeMatch[1], label: nodeMatch[2] || nodeMatch[3] || nodeMatch[1] });
+
+                    const edgeMatch = decoded.match(EDGE_REGEX);
+                    if (edgeMatch) edges.push({ source: edgeMatch[1], target: edgeMatch[2] });
+                }
+                return { nodes, edges };
+            };
+
+            const getRelatedNodes = nodeId => {
+                const related = new Set([nodeId]);
+                for (const edge of graphData.edges) {
+                    if (edge.source === nodeId) related.add(edge.target);
+                }
+                return related;
+            };
+
+            const getSourceNodes = nodeId => {
+                const sources = new Set();
+                for (const edge of graphData.edges) {
+                    if (edge.target === nodeId) sources.add(edge.source);
+                }
+                return sources;
+            };
+
+            const getNodeIdFromElement = elem => {
+                const elemId = elem.getAttribute('id');
+                if (elemId) {
+                    const cleanId = elemId.replace('flowchart-', '').replace('-node', '').replace(/-\d+$/, '');
+                    for (const node of graphData.nodes) {
+                        if (cleanId === node.id || elemId === 'flowchart-' + node.id || elemId === node.id) return node.id;
+                    }
+                }
+
+                const textContent = elem.textContent.trim().replace(/"/g, '').replace(/^[\(\)]|[\(\)]$/g, '').trim();
+                for (const node of graphData.nodes) {
+                    const label = node.label.replace(/"/g, '').replace(/^[\(\)]|[\(\)]$/g, '').trim();
+                    if (node.label === textContent || node.id === textContent || textContent === label || textContent === node.id) return node.id;
+                }
+                return null;
+            };
+
+            const getAllNodeElements = svg => {
+                const nodes = [], seen = new Set();
+                svg.querySelectorAll('.node').forEach(el => {
+                    if (el.textContent.trim() && !seen.has(el)) { nodes.push(el); seen.add(el); }
+                });
+                svg.querySelectorAll('g[id*="node"]').forEach(el => {
+                    if (!seen.has(el) && !el.id?.includes('cluster')) { nodes.push(el); seen.add(el); }
+                });
+                return nodes;
+            };
+
+            const getAllEdgeElements = svg => {
+                const edges = [];
+                const edgePathsContainer = svg.querySelector('.edgePaths');
+                const edgeLabelsContainer = svg.querySelector('.edgeLabels');
+                if (!edgePathsContainer || !edgeLabelsContainer) return edges;
+
+                const pathGroups = Array.from(edgePathsContainer.children);
+                const labelGroups = Array.from(edgeLabelsContainer.children);
+
+                pathGroups.forEach((pathGroup, i) => {
+                    const path = pathGroup.querySelector('path') || pathGroup.tagName === 'path' ? pathGroup : null;
+                    edges.push({ path, label: labelGroups[i] || null, id: pathGroup.getAttribute('id') || path?.id || `edge-${i}` });
+                });
+                return edges;
+            };
+
+            const selectNode = (nodeElem, nodeId) => {
+                const content = document.getElementById('mermaid-content');
+                const svg = content?.querySelector('svg');
+                if (!svg || !nodeElem) return;
+
+                if (selectedNode === nodeId) { deselectNode(); return; }
+                deselectNode();
+
+                selectedNode = nodeId;
+                const isMap = isMapNode(nodeId);
+                const relatedNodes = isMap ? new Set([nodeId, ...getSourceNodes(nodeId)]) : getRelatedNodes(nodeId);
+                const relatedEdgesData = isMap ? graphData.edges.filter(e => e.target === nodeId) : graphData.edges.filter(e => e.source === nodeId);
+
+                allNodes.forEach(node => {
+                    const thisNodeId = getNodeIdFromElement(node);
+                    if (!thisNodeId) return;
+                    node.classList.add(thisNodeId === nodeId ? 'selected' : relatedNodes.has(thisNodeId) ? 'related' : 'dimmed');
+                });
+
+                allEdges.forEach(edgeObj => {
+                    const isRelated = relatedEdgesData.some(re => edgeObj.id.includes(`${re.source}-${re.target}`) || (edgeObj.id.includes(`-${re.source}-`) && edgeObj.id.includes(`-${re.target}-`)));
+                    const classes = isRelated ? ['related', 'dimmed'] : ['dimmed', 'related'];
+                    [edgeObj.path, edgeObj.label].forEach(el => {
+                        if (el) { el.classList.remove(classes[1]); el.classList.add(classes[0]); }
+                    });
+                });
+            };
+
+            const deselectNode = () => {
+                const content = document.getElementById('mermaid-content');
+                if (!content) return;
+                content.querySelectorAll('.selected, .related, .dimmed').forEach(el => el.classList.remove('selected', 'related', 'dimmed'));
+                selectedNode = null;
+            };
+
+            const setupInteractivity = () => {
+                const content = document.getElementById('mermaid-content');
+                const svg = content?.querySelector('svg');
+                if (!svg) return;
+
+                if (svg.getAttribute('data-interactive') === 'true') return;
+                svg.setAttribute('data-interactive', 'true');
+
+                graphData = parseGraph(mermaidGraphText);
+                allNodes = getAllNodeElements(svg);
+                allEdges = getAllEdgeElements(svg);
+
+                allNodes.forEach(node => {
+                    node.style.cursor = 'pointer';
+                    const nodeId = getNodeIdFromElement(node);
+                    if (nodeId) {
+                        node.addEventListener('click', e => { e.stopPropagation(); selectNode(node, nodeId); });
+                    }
+                });
+
+                content.addEventListener('click', e => {
+                    if (e.target === content || e.target === svg) deselectNode();
+                });
+            };
+
+            // 新增：渲染mermaid图表
+            const renderMermaid = async () => {
+                // 如果已经渲染过，直接返回
+                if (isRendered) return true;
+
+                const mermaidDiv = document.getElementById('mermaid-diagram');
+                if (!mermaidDiv) return;
+
+                // 保存原始文本
+                mermaidGraphText = mermaidDiv.textContent || '';
+
+                try {
+                    // 使用全局mermaid实例渲染
+                    if (window.mermaidInstance) {
+                        await window.mermaidInstance.run();
+                        setupInteractivity();
+                        isRendered = true;
+                        return true;
+                    }
+                } catch (error) {
+                    console.error('Failed to render mermaid:', error);
+                }
+            };
+
+            const zoom = (delta = 0, reset = false) => {
+                if (reset) scale = 1;
+                else scale = Math.max(0.3, Math.min(3, scale + delta));
+                document.getElementById('mermaid-content').style.transform = `scale(${scale})`;
+            };
+
+            return { setupInteractivity, zoomIn: () => zoom(0.2), zoomOut: () => zoom(-0.2), reset: () => zoom(0, true), renderMermaid };
+        })();
+
+        // ========== Code Highlighting Module ==========
+        const CodeHighlighter = (() => {
+            // 预编译所有正则表达式
+            const PATTERNS = {
+                label: /^(\w+):$/,
+                instWithClass: /^\s*(\d+):\s*\((\w+)\)\s*(.*)$/,
+                instNoClass: /^\s*(\d+):\s*(.*)$/,
+                conditionalJump: /\b(if)\s+(.+?)\s+(goto)\s+(pc[+\-]\d+)$/,
+                simpleGoto: /\b(goto|call)\s+(pc[+\-]\d+|#\w+)(?:\s+(#\w+))?/,
+                pcOffset: /pc([+\-]\d+)/,
+                register: /\b(r[0-9]|r10|rfp)\b/g,
+                hexNumber: /\b(-?\d+|0x[0-9a-fA-F]+)ll\b/g,
+                number: /\b(-?\d+|0x[0-9a-fA-F]+)\b/g,
+                operator: /(==|!=|<=|>=|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|&=|\|=|\^=)/g,
+                memoryStore: /^\*\(([us])(8|16|32|64)\s*\*\)\((r[0-9]|r10|rfp)\s*([+\-])\s*(\d+)\)\s*=/,
+                memoryLoad: /=\s*\*\(([us])(8|16|32|64)\s*\*\)\((r[0-9]|r10|rfp)\s*([+\-])\s*(\d+)\)/,
+                typeCast: /\(([us])(8|16|32|64)\s*\*\)/g,
+                funcName: /\b(Fn[A-Z][a-zA-Z]*)\b/g,
+                mapFd: /(map_fd\d+)\s*<([^>]+)>/g,
+                structStart: /^struct\s+{/,
+                structEnd: /^}\s+(\w+)\s+SEC\((".*?")\)(.*$)/,
+                mapMacro: /^\s+(__uint|__type|__array)/,
+            };
+
+            // 缓存常用的HTML片段模板
+            const TEMPLATES = {
+                keyword: (text) => `<span class="bpf-keyword">${text}</span>`,
+                register: (text) => `<span class="bpf-register">${text}</span>`,
+                opcode: (text) => `<span class="bpf-opcode">${text}</span>`,
+                number: (text) => `<span class="bpf-number">${text}</span>`,
+                type: (text) => `<span class="bpf-type">${text}</span>`,
+                comment: (text) => `<span class="bpf-comment">${text}</span>`,
+                label: (text) => `<span class="bpf-label">${text}</span>`,
+                macro: (text) => `<span class="bpf-macro">${text}</span>`,
+                string: (text) => `<span class="bpf-string">${text}</span>`,
+                lineNumber: (text) => `<span class="bpf-line-number">${text}:</span>`,
+                class: (text) => `<span class="bpf-class">${text}</span>`
+            };
+
+            // 使用查找表替代replace函数调用
+            const escapeHtml = (() => {
+                const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+                return text => text.replace(/[&<>"']/g, c => map[c]);
+            })();
+
+            // 减少字符串拼接，使用数组
+            const createJumpLink = (fn, line, target, targetId) => {
+                const parts = ['<a class="jump-link" href="#', targetId, '" data-fn="', fn, '" data-line="',
+                    line, '">', escapeHtml(target), ' → ', line, '</a>'];
+                return parts.join('');
+            };
+
+            const createJumpFuncLink = (parentFn, fn) =>
+                `<a class="jump-link" href="#func-${parentFn}-${fn}" data-func="${parentFn}-${fn}">${escapeHtml(fn)}</a>`;
+
+            // 使用indexOf代替正则，避免不必要的匹配
+            const splitInstruction = instruction => {
+                const idx = instruction.indexOf('//');
+                if (idx === -1) return { instruction: instruction.trim(), comment: '' };
+                return {
+                    instruction: instruction.substring(0, idx).trim(),
+                    comment: instruction.substring(idx)
+                };
+            };
+
+            // 缓存高亮结果
+            const highlightTokens = text => {
+                if (!text) return '';
+                return text
+                    .replace(PATTERNS.register, '<span class="bpf-register">$&</span>')
+                    .replace(PATTERNS.operator, '<span class="bpf-opcode">$&</span>')
+                    .replace(PATTERNS.number, '<span class="bpf-number">$&</span>');
+            };
+
+            const processJumpInstruction = (instruction, lineNum, currentFn, jumpTargets) => {
+                // 先检查是否包含关键字，避免不必要的正则匹配
+                const hasIf = instruction.includes('if');
+                const hasGoto = instruction.includes('goto');
+                const hasCall = instruction.includes('call');
+
+                if (!hasIf && !hasGoto && !hasCall) return null;
+
+                // 条件跳转
+                if (hasIf && hasGoto) {
+                    const cjMatch = instruction.match(PATTERNS.conditionalJump);
+                    if (cjMatch) {
+                        const offsetMatch = cjMatch[4].match(PATTERNS.pcOffset);
+                        if (!offsetMatch) return null;
+
+                        const offset = parseInt(offsetMatch[1], 10);
+                        const targetLine = lineNum + offset + 1;
+                        const targetId = `${currentFn}-line-${targetLine}`;
+                        jumpTargets.add(targetId);
+
+                        return `${TEMPLATES.keyword('if')} ${highlightTokens(cjMatch[2])} ${TEMPLATES.keyword('goto')} ${createJumpLink(currentFn, targetLine, cjMatch[4], targetId)}`;
+                    }
+                }
+
+                // 简单跳转
+                if (hasGoto || hasCall) {
+                    const gotoMatch = instruction.match(PATTERNS.simpleGoto);
+                    if (gotoMatch) {
+                        if (gotoMatch[3] !== undefined) {
+                            const funcName = gotoMatch[3].substring(1);
+                            const targetId = `func-${currentFn}-${funcName}`;
+                            jumpTargets.add(targetId);
+                            return `${TEMPLATES.keyword(gotoMatch[1])} #${createJumpFuncLink(currentFn, funcName)}`;
+                        }
+
+                        const target = gotoMatch[2];
+                        if (target[0] === '#') {
+                            const funcName = target.substring(1);
+                            const targetId = `func-${currentFn}-${funcName}`;
+                            jumpTargets.add(targetId);
+                            return `${TEMPLATES.keyword(gotoMatch[1])} #${createJumpFuncLink(currentFn, funcName)}`;
+                        } else {
+                            const offsetMatch = target.match(PATTERNS.pcOffset);
+                            if (!offsetMatch) return null;
+
+                            const offset = parseInt(offsetMatch[1], 10);
+                            const targetLine = lineNum + offset + 1;
+                            const targetId = `${currentFn}-line-${targetLine}`;
+                            jumpTargets.add(targetId);
+                            return `${TEMPLATES.keyword(gotoMatch[1])} ${createJumpLink(currentFn, targetLine, target, targetId)}`;
+                        }
+                    }
+                }
+
+                return null;
+            };
+
+            // 使用占位符映射表，避免多次replace
+            const PLACEHOLDER_MAP = {
+                MEM_STORE: (us, bits, reg, op, num) =>
+                    `${TEMPLATES.opcode('*')}(${TEMPLATES.type(us + bits)} *)(${TEMPLATES.register(reg)}${TEMPLATES.opcode(op)}${TEMPLATES.number(num)}) ${TEMPLATES.opcode('=')}`,
+                MEM_LOAD: (us, bits, reg, op, num) =>
+                    `${TEMPLATES.opcode('=')} ${TEMPLATES.opcode('*')}(${TEMPLATES.type(us + bits)} *)(${TEMPLATES.register(reg)}${TEMPLATES.opcode(op)}${TEMPLATES.number(num)})`,
+                TYPE_CAST: (us, bits) => `(${TEMPLATES.type(us + bits)} *)`,
+                MAP_FD: (fd, name) => `${TEMPLATES.number(fd)} &lt;${TEMPLATES.string(name)}&gt;`
+            };
+
+            const highlightInstruction = (rawInstruction, lineNum, currentFn, jumpTargets) => {
+                if (!rawInstruction) return '';
+
+                const { instruction, comment } = splitInstruction(rawInstruction);
+
+                // 跳转指令优先处理
+                if (lineNum != null) {
+                    const jumpResult = processJumpInstruction(instruction, lineNum, currentFn, jumpTargets);
+                    if (jumpResult) {
+                        return comment ? `${jumpResult} ${TEMPLATES.comment(escapeHtml(comment))}` : jumpResult;
+                    }
+                }
+
+                let result = instruction;
+
+                // 使用数组收集占位符信息，减少replace次数
+                const placeholders = [];
+
+                // 1. 标记特殊模式
+                result = result.replace(PATTERNS.memoryStore, (match, us, bits, reg, op, num) => {
+                    const id = placeholders.length;
+                    placeholders.push({ type: 'MEM_STORE', args: [us, bits, reg, op, num] });
+                    return `<<<PH${id}>>>`;
+                });
+
+                result = result.replace(PATTERNS.memoryLoad, (match, us, bits, reg, op, num) => {
+                    const id = placeholders.length;
+                    placeholders.push({ type: 'MEM_LOAD', args: [us, bits, reg, op, num] });
+                    return `<<<PH${id}>>>`;
+                });
+
+                result = result.replace(PATTERNS.typeCast, (match, us, bits) => {
+                    const id = placeholders.length;
+                    placeholders.push({ type: 'TYPE_CAST', args: [us, bits] });
+                    return `<<<PH${id}>>>`;
+                });
+
+                result = result.replace(PATTERNS.mapFd, (match, fd, name) => {
+                    const id = placeholders.length;
+                    placeholders.push({ type: 'MAP_FD', args: [fd, name] });
+                    return `<<<PH${id}>>>`;
+                });
+
+                // 2. 转义HTML
+                result = escapeHtml(result);
+
+                // 3. 恢复占位符 - 使用预计算的映射
+                placeholders.forEach((ph, id) => {
+                    const replacement = PLACEHOLDER_MAP[ph.type](...ph.args);
+                    result = result.replace(`&lt;&lt;&lt;PH${id}&gt;&gt;&gt;`, replacement);
+                });
+
+                // 4. 处理其他高亮 - 按顺序优化，减少重复扫描
+                result = result
+                    .replace(/\b(call|exit|ll|if|goto)\b/g, match => TEMPLATES.keyword(match))
+                    .replace(PATTERNS.register, match => TEMPLATES.register(match))
+                    .replace(/(==|!=|&lt;=|&gt;=|&lt;&lt;=|&gt;&gt;=|&lt;&lt;|&gt;&gt;|\+=|-=|\*=|\/=|&amp;=|\|=|\^=)/g, match => TEMPLATES.opcode(match))
+                    .replace(PATTERNS.hexNumber, match => `${TEMPLATES.number(match.slice(0, -2))}ll`);
+
+                // 5. 赋值操作符
+                if (result.indexOf('class="bpf-opcode">=</span>') === -1) {
+                    result = result.replace(/\s=\s/g, ` ${TEMPLATES.opcode('=')} `);
+                }
+
+                // 6. 数字
+                result = result.replace(PATTERNS.number, match => TEMPLATES.number(match));
+
+                // 7. PC偏移标签
+                if (result.indexOf('jump-link') === -1) {
+                    result = result.replace(/\b(pc[+\-]\d+)\b/g, match => TEMPLATES.label(match));
+                }
+
+                // 8. 函数名
+                result = result.replace(PATTERNS.funcName, match => TEMPLATES.macro(match));
+
+                return comment ? `${result} ${TEMPLATES.comment(escapeHtml(comment))}` : result;
+            };
+
+            // 使用switch代替多个if-else
+            const processLine = (line, currentFn, jumpTargets) => {
+                const trimmed = line.trim();
+                if (!trimmed) return '';
+
+                // 检查第一个字符来快速分类
+                const firstChar = trimmed[0];
+
+                // 注释行
+                if (firstChar === '/') {
+                    if (trimmed[1] === '/') {
+                        if (trimmed.startsWith('// SEC(')) {
+                            currentFn.isEnable = true
+                        }
+                        return `<span class="bpf-line comment c-comment">${escapeHtml(line)}</span>`;
+                    }
+                } else if (firstChar === ';') {
+                    return `<span class="bpf-line comment bpf-comment">${escapeHtml(line)}</span>`;
+                }
+
+                // 数字开头 - 可能是指令
+                if (firstChar >= '0' && firstChar <= '9') {
+                    // BPF指令（带类）
+                    const bpfMatch = line.match(PATTERNS.instWithClass);
+                    if (bpfMatch) {
+                        const lineNum = parseInt(bpfMatch[1], 10);
+                        const lineId = `${currentFn.parent}-line-${lineNum}`;
+                        const highlighted = highlightInstruction(bpfMatch[3], lineNum, currentFn.parent, jumpTargets);
+                        return `<span class="bpf-line instruction" id="${lineId}">${TEMPLATES.lineNumber(bpfMatch[1])}(${TEMPLATES.class(bpfMatch[2])}) ${highlighted}</span>`;
+                    }
+
+                    // BPF指令（无类）
+                    const simpleMatch = line.match(PATTERNS.instNoClass);
+                    if (simpleMatch) {
+                        const lineNum = parseInt(simpleMatch[1], 10);
+                        const lineId = `${currentFn.parent}-line-${lineNum}`;
+                        const highlighted = highlightInstruction(simpleMatch[2], lineNum, currentFn.parent, jumpTargets);
+                        return `<span class="bpf-line instruction" id="${lineId}">${TEMPLATES.lineNumber(simpleMatch[1])} ${highlighted}</span>`;
+                    }
+                }
+
+                // 标签（字母开头，冒号结尾）
+                if ((firstChar >= 'a' && firstChar <= 'z') || (firstChar >= 'A' && firstChar <= 'Z')) {
+                    const labelMatch = line.match(PATTERNS.label);
+                    if (labelMatch) {
+                        if (currentFn.isEnable) {
+                            currentFn.parent = labelMatch[1];
+                            currentFn.children = labelMatch[1];
+                            currentFn.isEnable = false;
+                        } else {
+                            currentFn.children = labelMatch[1];
+                        }
+                        return `<span class="bpf-line label" id="func-${currentFn.parent}-${currentFn.children}">${TEMPLATES.label(escapeHtml(line))}</span>`;
+                    }
+                }
+
+                // 结构体定义
+                if (firstChar === 's' && PATTERNS.structStart.test(line)) {
+                    return `<span class="bpf-line"><span class="c-keyword">struct</span> {</span>`;
+                }
+
+                if (firstChar === '}') {
+                    const structEndMatch = line.match(PATTERNS.structEnd);
+                    if (structEndMatch) {
+                        return `<span class="bpf-line">} <span class="c-type">${structEndMatch[1]}</span> SEC(<span class="c-sec">${structEndMatch[2]}</span>)${structEndMatch[3]}</span>`;
+                    }
+                }
+
+                // Map宏（空格开头）
+                if (firstChar === ' ' && PATTERNS.mapMacro.test(line)) {
+                    const processed = line
+                        .replace(/(__\w+)/g, '<span class="c-macro">$1</span>')
+                        .replace(/(\(type,\s*)(\w+)/g, '$1<span class="c-keyword">$2</span>')
+                        .replace(/(\d+)/g, '<span class="c-number">$1</span>');
+                    return `<span class="bpf-line">${processed}</span>`;
+                }
+
+                // 其他行
+                return `<span class="bpf-line">${escapeHtml(line)}</span>`;
+            };
+
+            // 批量处理，减少中间对象创建
+            const highlightCode = code => {
+                const jumpTargets = new Set();
+                const currentFn = { parent: 'global', children: 'global', isEnable: false };
+                const lines = code.split('\n');
+                const len = lines.length;
+
+                // 预分配数组大小
+                const processedLines = new Array(len);
+                let outputIndex = 0;
+
+                // 批量处理
+                for (let i = 0; i < len; i++) {
+                    const result = processLine(lines[i], currentFn, jumpTargets);
+                    if (result) {
+                        processedLines[outputIndex++] = result;
+                    }
+                }
+
+                // 使用准确大小的数组join
+                processedLines.length = outputIndex;
+                let result = processedLines.join('');
+
+                // 批量标记跳转目标 - 只有在存在跳转目标时才处理
+                if (jumpTargets.size > 0) {
+                    const marker = '<span class="jump-target-marker"></span>';
+                    // 转换为数组一次性处理
+                    const targets = Array.from(jumpTargets);
+                    for (let i = 0; i < targets.length; i++) {
+                        const pattern = `id="${targets[i]}">`;
+                        const replacement = `id="${targets[i]}">${marker}`;
+                        result = result.replace(pattern, replacement);
+                    }
+                }
+
+                return result;
+            };
+
+            return { highlightCode };
+        })();
+
+        // ========== Search Module ==========
+        const Search = (() => {
+            let matches = [], currentIndex = -1;
+            let codeEl, searchCount, prevBtn, nextBtn;
+
+            const init = () => {
+                codeEl = document.getElementById('code-content');
+                searchCount = document.getElementById('search-count');
+                prevBtn = document.getElementById('prev-match');
+                nextBtn = document.getElementById('next-match');
+            };
+
+            const perform = query => {
+                const lines = codeEl?.querySelectorAll('.bpf-line') || [];
+                lines.forEach(l => l.classList.remove('highlight'));
+                matches = [];
+                currentIndex = -1;
+
+                if (!query.trim()) {
+                    searchCount.style.display = 'none';
+                    prevBtn.disabled = nextBtn.disabled = true;
+                    return;
+                }
+
+                const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+                lines.forEach((line, i) => {
+                    if (regex.test(line.textContent)) {
+                        matches.push(i);
+                    }
+                });
+
+                if (matches.length) {
+                    currentIndex = 0;
+                    highlightCurrent();
+                    searchCount.textContent = `1/${matches.length}`;
+                    searchCount.style.display = 'inline';
+                    prevBtn.disabled = false;
+                    nextBtn.disabled = matches.length <= 1;
+                } else {
+                    searchCount.textContent = '0/0';
+                    searchCount.style.display = 'inline';
+                    prevBtn.disabled = nextBtn.disabled = true;
+                }
+            };
+
+            const highlightCurrent = () => {
+                const lines = codeEl?.querySelectorAll('.bpf-line') || [];
+                lines.forEach(l => l.classList.remove('highlight'));
+                if (currentIndex >= 0 && matches[currentIndex] !== undefined) {
+                    const matchLine = lines[matches[currentIndex]];
+                    if (matchLine) {
+                        matchLine.classList.add('highlight');
+                        matchLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            };
+
+            const next = () => {
+                if (!matches.length) return;
+                currentIndex = (currentIndex + 1) % matches.length;
+                searchCount.textContent = `${currentIndex + 1}/${matches.length}`;
+                highlightCurrent();
+            };
+
+            const prev = () => {
+                if (!matches.length) return;
+                currentIndex = (currentIndex - 1 + matches.length) % matches.length;
+                searchCount.textContent = `${currentIndex + 1}/${matches.length}`;
+                highlightCurrent();
+            };
+
+            return { init, perform, next, prev };
+        })();
+
+        // ========== Jump Navigation ==========
+        window.jumpToLine = (fn, line) => {
+            const el = document.getElementById(`${fn}-line-${line}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('jump-target');
+                setTimeout(() => el.classList.remove('jump-target'), 2000);
+            }
+        };
+        window.jumpToFunc = (fn) => {
+            const el = document.getElementById(`func-${fn}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('jump-target');
+                setTimeout(() => el.classList.remove('jump-target'), 2000);
+            }
+        };
+
+        // ========== Copy Function ==========
+        let savedSelection = null;
+
+        const copyCode = () => {
+            const btn = document.getElementById('copy-btn');
+            if (!btn) return;
+
+            let textToCopy = '';
+
+            if (savedSelection) {
+                // 有选中的内容
+                const range = savedSelection;
+                const codeEl = document.getElementById('code-content');
+
+                if (codeEl) {
+                    // 获取所有 bpf-line 元素
+                    const allLines = Array.from(codeEl.querySelectorAll('.bpf-line'));
+                    const startNode = range.startContainer;
+                    const endNode = range.endContainer;
+
+                    // 找到选区开始和结束的行索引
+                    let startIndex = allLines.findIndex(line =>
+                        line.contains(startNode) || line === startNode
+                    );
+                    let endIndex = allLines.findIndex(line =>
+                        line.contains(endNode) || line === endNode
+                    );
+
+                    if (startIndex >= 0 && endIndex >= 0) {
+                        // 跨越多行的情况 - 用换行连接完整行
+                        if (startIndex !== endIndex) {
+                            const selectedLines = allLines.slice(startIndex, endIndex + 1);
+                            textToCopy = selectedLines.map(line => line.textContent).join('\n');
+                        } else {
+                            // 单行的情况 - 使用原始选中的文本（可能只是部分内容）
+                            textToCopy = range.toString();
+                        }
+                    }
+                }
+                savedSelection = null;
+            }
+
+            if (!textToCopy) {
+                const codeEl = document.getElementById('code-content');
+                if (codeEl) {
+                    const lines = codeEl.querySelectorAll('.bpf-line');
+                    const lineTexts = Array.from(lines).map(line => line.textContent);
+                    textToCopy = lineTexts.join('\n');
+                }
+            }
+
+            if (!textToCopy) return;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                btn.classList.add('copied');
+                btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = '<i class="ti ti-copy"></i> Copy';
+                }, 2000);
+            }).catch(e => console.error('Copy failed:', e));
+        };
+
+        // ========== Tabs Module ==========
+        const Tabs = (() => {
+            let tabs, panels;
+
+            // 标记mermaid是否已渲染
+            let mermaidRendered = false;
+
+            const showTab = targetId => {
+                tabs.forEach(t => t.parentElement.classList.remove('ui-tabs-active'));
+                panels.forEach(p => p.style.display = 'none');
+
+                const targetTab = Array.from(tabs).find(t => t.getAttribute('href') === `#${targetId}`);
+                if (targetTab) targetTab.parentElement.classList.add('ui-tabs-active');
+
+                const targetPanel = document.getElementById(targetId);
+                if (targetPanel) targetPanel.style.display = 'block';
+
+                if (targetId === 'tab-2' && !mermaidRendered) {
+                    requestAnimationFrame(async () => {
+                        const success = await MermaidGraph.renderMermaid();
+                        if (success) {
+                            mermaidRendered = true;
+                        }
+                    });
+                }
+            };
+
+            const init = () => {
+                tabs = document.querySelectorAll('#tabs .ui-tabs-nav li a');
+                panels = document.querySelectorAll('.ui-tabs-panel');
+
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', e => {
+                        e.preventDefault();
+                        showTab(tab.getAttribute('href').substring(1));
+                    });
+                });
+
+                if (tabs.length > 0) {
+                    const firstPanelId = tabs[0].getAttribute('href').substring(1);
+                    tabs[0].parentElement.classList.add('ui-tabs-active');
+                    const firstPanel = document.getElementById(firstPanelId);
+                    if (firstPanel) firstPanel.style.display = 'block';
+                }
+            };
+
+            return { init };
+        })();
+
+        // ========== Initialization ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            // Code highlighting
+            const codeEl = document.getElementById('code-content');
+            if (codeEl) {
+                codeEl.innerHTML = CodeHighlighter.highlightCode(codeEl.textContent);
+            }
+
+            // Initialize search
+            Search.init();
+            const searchInput = document.getElementById('search-input');
+            let searchTimeout;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => Search.perform(searchInput.value), 200);
+            });
+            searchInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') e.shiftKey ? Search.prev() : Search.next();
+                else if (e.key === 'Escape') { searchInput.value = ''; Search.perform(''); }
+            });
+            document.getElementById('prev-match').addEventListener('click', Search.prev);
+            document.getElementById('next-match').addEventListener('click', Search.next);
+
+            // Initialize tabs
+            Tabs.init();
+
+            // Mermaid zoom buttons
+            document.getElementById('zoom-in-btn').addEventListener('click', MermaidGraph.zoomIn);
+            document.getElementById('zoom-out-btn').addEventListener('click', MermaidGraph.zoomOut);
+            document.getElementById('reset-zoom-btn').addEventListener('click', MermaidGraph.reset);
+            // Save selection on mousedown (before click clears it)
+            document.getElementById('copy-btn').addEventListener('mousedown', () => {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0 && selection.toString().trim().length > 0) {
+                    savedSelection = selection.getRangeAt(0).cloneRange();
+                } else {
+                    savedSelection = null;
+                }
+            });
+            document.getElementById('copy-btn').addEventListener('click', copyCode);
+
+            // Jump links delegation
+            document.getElementById('code-content')?.addEventListener('click', e => {
+                const link = e.target.closest('.jump-link');
+                if (link) {
+                    e.preventDefault();
+                    if (link.dataset.fn && link.dataset.line) {
+                        const fn = link.dataset.fn;
+                        const line = parseInt(link.dataset.line, 10);
+                        if (fn && line) window.jumpToLine(fn, line);
+                    } else if (link.dataset.func) {
+                        const func = link.dataset.func;
+                        if (func) window.jumpToFunc(func);
+                    }
+                }
+            });
+            // 回到顶部按钮功能
+            const backToTopBtn = document.getElementById('backToTop');
+
+            // 显示/隐藏回到顶部按钮
+            const toggleBackToTop = () => {
+                if (window.scrollY > 300) {
+                    backToTopBtn.classList.add('visible');
+                } else {
+                    backToTopBtn.classList.remove('visible');
+                }
+            };
+
+            // 滚动到顶部
+            const scrollToTop = () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            };
+
+            // 监听滚动事件
+            window.addEventListener('scroll', toggleBackToTop);
+
+            // 点击事件
+            backToTopBtn.addEventListener('click', scrollToTop);
+
+            // 初始检查
+            toggleBackToTop();
+        });
+    </script>
+
+</body>
+
+</html>
