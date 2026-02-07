@@ -27,8 +27,9 @@ We hope this tool will make eBPF development more productive and less frustratin
 ### Disassembly
 - Full BPF instruction disassembly from ELF object files
 - Human-readable instruction formatting with register names
-- Program metadata including section, type, and instruction count
+- Program metadata including section, type, and instruction offset
 - Support for all standard BPF instruction types
+- **Note**: BPF programs must be compiled with the `-g` option to preserve debug information
 
 ### Visualization
 - **Mermaid flow graphs** showing program-to-map relationships
