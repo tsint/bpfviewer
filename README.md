@@ -118,7 +118,7 @@ bpfviewer/
 
 ## Comparison with Other Tools
 
-| Tool | Disassembly | Visualization | Web UI | Map Relationships |
+| Tool | Disassembly | Visualization | Web UI | Prog-Map Relationships |
 |------|-------------|---------------|--------|-------------------|
 | **bpfviewer** | ✅ | ✅ | ✅ | ✅ |
 | llvm-objdump | ✅ | ❌ | ❌ | ❌ |
