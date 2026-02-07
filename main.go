@@ -127,6 +127,19 @@ func isJump(ins asm.Instruction) bool {
 	return false
 }
 
+func isMapFunc(f asm.BuiltinFunc) bool {
+	switch f {
+	case asm.FnMapLookupElem, asm.FnMapUpdateElem, asm.FnMapDeleteElem,
+		asm.FnMapPushElem, asm.FnMapPopElem, asm.FnMapPeekElem, asm.FnMapLookupPercpuElem,
+		asm.FnRingbufOutput, asm.FnRingbufReserve, asm.FnPerfEventOutput, asm.FnRingbufQuery,
+		asm.FnForEachMapElem, asm.FnTailCall, asm.FnRedirectMap, asm.FnSkRedirectMap,
+		asm.FnTracePrintk:
+		return true
+	default:
+		return false
+	}
+}
+
 func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) {
 	var codeBuilder strings.Builder
 	codeBuilder.WriteString("// File: ")
@@ -143,11 +156,10 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 	}
 
 	var mapsList []*ebpf.MapSpec
+	mapNode := []string{}
 	for _, m := range spec.Maps {
-		if m.Name == ".rodata" || m.Name == ".bss" {
-			continue
-		}
 		mapsList = append(mapsList, m)
+		mapNode = append(mapNode, m.Name)
 	}
 	sort.Slice(mapsList, func(i, j int) bool {
 		return mapsList[i].Name < mapsList[j].Name
@@ -161,7 +173,6 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 		return progsList[i].Name < progsList[j].Name
 	})
 
-	mapNode := []string{}
 	for _, m := range mapsList {
 		codeBuilder.WriteString(fmt.Sprintf("struct {\n    __uint(type, %s);\n    __uint(max_entries, %d);"+
 			"\n    __uint(key_size, %d);\n    __uint(value_size, %d);\n} %s SEC(\".maps\");\n\n",
@@ -171,7 +182,6 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 		graphBuilder.WriteString("[(\"")
 		graphBuilder.WriteString(m.Name)
 		graphBuilder.WriteString("\")]\n")
-		mapNode = append(mapNode, m.Name)
 	}
 
 	for _, prog := range progsList {
@@ -183,10 +193,12 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 		references := make(map[string]bool)
 		previousRef := map[asm.Register][]string{}
 		isSet := false
-		isRef := false
 		for _, ins := range prog.Instructions {
 			if ins.IsBuiltinCall() {
 				builtinFunc := asm.BuiltinFunc(ins.Constant)
+				if !isMapFunc(builtinFunc) {
+					continue
+				}
 				builtinFuncName := fmt.Sprint(builtinFunc)
 				ref := []string{}
 				if strings.HasPrefix(builtinFuncName, "FnMap") &&
@@ -194,11 +206,23 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 					builtinFuncName = strings.TrimPrefix(builtinFuncName, "FnMap")
 					builtinFuncName = strings.TrimSuffix(builtinFuncName, "Elem")
 					ref, _ = previousRef[asm.R1]
-					isRef = true
-				} else if builtinFuncName == "FnPerfEventOutput" {
-					builtinFuncName = strings.TrimPrefix(builtinFuncName, "FnPerf")
-					ref, _ = previousRef[asm.R2]
-					isRef = true
+				} else if builtinFunc == asm.FnPerfEventOutput ||
+					builtinFunc == asm.FnRingbufOutput ||
+					builtinFunc == asm.FnRingbufReserve {
+					if builtinFunc == asm.FnPerfEventOutput {
+						builtinFuncName = "PerfEventOutput"
+						ref, _ = previousRef[asm.R2]
+					} else {
+						builtinFuncName = "RingbufOutput"
+						ref, _ = previousRef[asm.R1]
+					}
+				} else if builtinFunc == asm.FnRingbufQuery || builtinFunc == asm.FnForEachMapElem || builtinFunc == asm.FnTailCall {
+					builtinFuncName = strings.TrimPrefix(builtinFuncName, "Fn")
+					if builtinFunc == asm.FnTailCall {
+						ref, _ = previousRef[asm.R2]
+					} else {
+						ref, _ = previousRef[asm.R1]
+					}
 				}
 				if len(ref) > 0 {
 					for _, r := range ref {
@@ -207,12 +231,8 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 						}
 					}
 				}
-				if isRef {
-					isRef = false
-					isSet = false
-					previousRef = map[asm.Register][]string{}
-					continue
-				}
+				isSet = false
+				previousRef = map[asm.Register][]string{}
 			}
 			if isJump(ins) {
 				isSet = false
@@ -227,6 +247,10 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 		}
 		possibleVerbs := []string{
 			"Lookup",
+			"Push",
+			"Pop",
+			"Peek",
+			"LookupPercpu",
 			"Update",
 			"Delete",
 		}
@@ -245,16 +269,24 @@ func parseBPF(fileName string, reader *bytes.Reader, results map[string]string) 
 			mapName := parts[0]
 			// If several arrows exist, merge them
 			verbs := []string{}
-			for _, verb := range possibleVerbs {
-				if references[mapName+"|"+verb] {
-					verbs = append(verbs, verb)
+			if mapName == ".rodata" {
+				fnName = "Lookup"
+				if !references[".rodata|Lookup"] {
+					continue
 				}
-			}
-			if len(verbs) > 1 {
-				for _, verb := range verbs {
-					references[mapName+"|"+verb] = false
+				references[".rodata|Lookup"] = false
+			} else {
+				for _, verb := range possibleVerbs {
+					if references[mapName+"|"+verb] {
+						verbs = append(verbs, verb)
+					}
 				}
-				fnName = strings.Join(verbs, "+")
+				if len(verbs) > 1 {
+					for _, verb := range verbs {
+						references[mapName+"|"+verb] = false
+					}
+					fnName = strings.Join(verbs, "+")
+				}
 			}
 
 			graphBuilder.WriteString(prog.Name)
