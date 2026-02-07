@@ -27,23 +27,3 @@ jobs:
         GOOS=linux GOARCH=amd64 go build -o build/bpfviewer-amd64 -v ./...
         GOOS=linux GOARCH=arm64 go build -o build/bpfviewer-arm64 -v ./...  
 
-    - name: Archive Build
-      run: |
-        tar -czvf bpfviewer-${{ github.ref_name }}-linux.tar.gz -C build .
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.ref_name }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Test
-      run: go test -v ./...
-
-    - name: Upload Release Asset
-      uses: softprops/action-gh-release@v2
-      with:
-        files: bpfviewer-${{ github.ref_name }}-linux.tar.gz
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
