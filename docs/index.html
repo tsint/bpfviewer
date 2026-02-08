@@ -8,6 +8,13 @@
     <!-- Google Search Console -->
     <meta name="google-site-verification" content="Ay_Z4ZzZth4IlZs8tfWnqPHpsr-dK5WUsNlDSu5_2zs" />
 
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'none';
+      style-src 'unsafe-inline';
+      script-src 'self' https://cdn.jsdelivr.net;
+      img-src data:;
+      connect-src 'self' https://raw.githubusercontent.com;
+    ">
     <!-- Markdown 渲染库 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
