@@ -26,7 +26,9 @@
     <div id="content">Loading README.md...</div>
 
     <script>
-        fetch('../README.md')
+        fetch(
+            'https://raw.githubusercontent.com/tsint/bpfviewer/main/README.md'
+        )
             .then(res => res.text())
             .then(md => {
                 document.getElementById('content').innerHTML = marked.parse(md);
