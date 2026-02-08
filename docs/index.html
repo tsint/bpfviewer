@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>bpfviewer</title>
+
+    <!-- Google Search Console -->
+    <meta name="google-site-verification" content="Ay_Z4ZzZth4IlZs8tfWnqPHpsr-dK5WUsNlDSu5_2zs" />
+
+    <!-- Markdown 渲染库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        body {
+            max-width: 900px;
+            margin: 40px auto;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont;
+            line-height: 1.7;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="content">Loading README.md...</div>
+
+    <script>
+        fetch('../README.md')
+            .then(res => res.text())
+            .then(md => {
+                document.getElementById('content').innerHTML = marked.parse(md);
+            })
+            .catch(err => {
+                document.getElementById('content').innerText =
+                    'Failed to load README.md';
+            });
+    </script>
+
+</body>
+
+</html>
