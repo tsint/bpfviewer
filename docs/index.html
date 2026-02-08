@@ -3,49 +3,55 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>bpfviewer</title>
-
     <!-- Google Search Console -->
     <meta name="google-site-verification" content="Ay_Z4ZzZth4IlZs8tfWnqPHpsr-dK5WUsNlDSu5_2zs" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta http-equiv="Content-Security-Policy" content="
-      default-src 'none';
-      style-src 'unsafe-inline';
-      script-src 'self' https://cdn.jsdelivr.net;
-      img-src data:;
-      connect-src 'self' https://raw.githubusercontent.com;
-    ">
+    <title>bpfviewer</title>
+
     <!-- Markdown 渲染库 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
     <style>
-        body {
-            max-width: 900px;
-            margin: 40px auto;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont;
-            line-height: 1.7;
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+
+        @media (max-width: 767px) {
+            .markdown-body {
+                padding: 15px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <div id="content">Loading README.md...</div>
+    <article id="content" class="markdown-body"></article>
 
     <script>
-        fetch(
-            'https://raw.githubusercontent.com/tsint/bpfviewer/main/README.md'
-        )
-            .then(res => res.text())
-            .then(md => {
-                document.getElementById('content').innerHTML = marked.parse(md);
-            })
-            .catch(err => {
-                document.getElementById('content').innerText =
-                    'Failed to load README.md';
-            });
-    </script>
+        async function renderMarkdown() {
+            const contentDiv = document.getElementById('content');
+            try {
+                // 1. 获取 README.md 的原始文本
+                const response = await fetch('./README.md');
+                if (!response.ok) throw new Error('无法加载 README.md');
 
+                const mdText = await response.text();
+
+                // 2. 使用 marked 将 Markdown 转为 HTML
+                contentDiv.innerHTML = marked.parse(mdText);
+            } catch (err) {
+                contentDiv.innerHTML = `<p style="color:red">错误: ${err.message}</p>`;
+            }
+        }
+
+        renderMarkdown();
+    </script>
 </body>
 
 </html>
