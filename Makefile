@@ -1,4 +1,4 @@
-.PHONY: all debug clean
+.PHONY: all debug clean package
 
 FLAGS := -buildvcs=false
 LDFLAGS := -w -s
@@ -14,3 +14,7 @@ debug: all
 
 clean:
 	rm -rf build/
+
+package: all
+	cp -f bpf_template.html home.html build/
+	tar -czvf bpfviewer-linux.tgz  -C build .
